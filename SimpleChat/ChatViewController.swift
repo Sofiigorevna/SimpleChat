@@ -8,6 +8,7 @@
 import UIKit
 
 class ChatViewController: UIViewController {
+    private let webSocketManager = WebSocketManager()
 
     override func viewDidLoad() {
         super.viewDidLoad()

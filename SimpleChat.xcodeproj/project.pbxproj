@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D28FBAAE2E1E9BFF0090F2D6 /* Starscream in Frameworks */ = {isa = PBXBuildFile; productRef = D28FBAAD2E1E9BFF0090F2D6 /* Starscream */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		D278B89F2E1E64220081FDE5 /* SimpleChat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimpleChat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D28FBAAE2E1E9BFF0090F2D6 /* Starscream in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -77,8 +82,6 @@
 				D278B8A12E1E64220081FDE5 /* SimpleChat */,
 			);
 			name = SimpleChat;
-			packageProductDependencies = (
-			);
 			productName = SimpleChat;
 			productReference = D278B89F2E1E64220081FDE5 /* SimpleChat.app */;
 			productType = "com.apple.product-type.application";
@@ -107,6 +110,9 @@
 			);
 			mainGroup = D278B8962E1E64220081FDE5;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D28FBAAC2E1E9BFF0090F2D6 /* XCRemoteSwiftPackageReference "Starscream" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D278B8A02E1E64220081FDE5 /* Products */;
 			projectDirPath = "";
@@ -343,6 +349,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D28FBAAC2E1E9BFF0090F2D6 /* XCRemoteSwiftPackageReference "Starscream" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/daltoniam/Starscream";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.0.8;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D28FBAAD2E1E9BFF0090F2D6 /* Starscream */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D28FBAAC2E1E9BFF0090F2D6 /* XCRemoteSwiftPackageReference "Starscream" */;
+			productName = Starscream;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D278B8972E1E64220081FDE5 /* Project object */;
 }
