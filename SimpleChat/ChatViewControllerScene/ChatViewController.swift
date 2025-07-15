@@ -60,6 +60,10 @@ final class ChatViewController: UIViewController {
         updateSnapshot()
     }
     
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
     @objc private func pressToSendFileMessage(_ notification: Notification) {
         if let newMessage = notification.userInfo?["message"] as? Message {
             messages.append(.message(newMessage))

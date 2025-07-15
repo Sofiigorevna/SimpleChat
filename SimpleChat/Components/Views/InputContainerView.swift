@@ -12,10 +12,11 @@ final class InputContainerView: UIView {
     private let inputContainerView = UIView()
     private let inputTextView = UITextView()
     private let sendButton = UIButton(type: .system)
-    private var bottomConstraint: NSLayoutConstraint!
+    private var maxHeightConstraint: NSLayoutConstraint?
 
     weak var delegate: AttachMenuViewControllerDelegate?
-    
+    var onHeightChanged: (() -> Void)?
+
     // MARK: - Initializers
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -87,42 +88,20 @@ final class InputContainerView: UIView {
         // Анимируем изменение layout, чтобы изменение высоты выглядело плавно.
         UIView.animate(withDuration: 0.2) {
             self.layoutIfNeeded()
+            self.onHeightChanged?()
         }
     }
     
-    @objc private func keyboardWillShow(notification: NSNotification) {
-        guard
-            let userInfo = notification.userInfo,
-            let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-            let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
-        else { return }
-
-        // Преобразуем frame клавиатуры в координаты AttachMenuView
-        let keyboardFrameInView = self.convert(keyboardFrame, from: nil)
-        let overlap = self.bounds.maxY - keyboardFrameInView.minY
-
-        bottomConstraint.constant = -max(overlap, 0)
-        UIView.animate(withDuration: duration) {
-            self.layoutIfNeeded()
-        }
-    }
-    
-    @objc private func keyboardWillHide(notification: NSNotification) {
-        guard
-            let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
-            bottomConstraint != nil
-        else { return }
-        
-        bottomConstraint.constant = 0
-        
-        UIView.animate(withDuration: duration) {
-            self.layoutIfNeeded()
-        }
-    }
-
     func toggleInput(isSelection: Bool) {
         buttonStackView.isHidden = isSelection
         inputContainerView.isHidden = !isSelection
+    }
+    
+    func setMaxHeight(_ height: CGFloat) {
+        maxHeightConstraint?.isActive = false
+        maxHeightConstraint = heightAnchor.constraint(lessThanOrEqualToConstant: height)
+        maxHeightConstraint?.priority = .required
+        maxHeightConstraint?.isActive = true
     }
 }
 
@@ -130,14 +109,12 @@ final class InputContainerView: UIView {
 private extension InputContainerView {
     func setupHierarchy() {
         self.backgroundColor = .systemBackground
-        inputContainerView.backgroundColor = .red
         [buttonStackView, inputContainerView].forEach { view in
             self.addSubview(view)
         }
         setupAttachMenu()
         setupInputTextView()
         setupButtons()
-        setupKeyboard()
         setupInputObservers()
     }
     
@@ -145,8 +122,6 @@ private extension InputContainerView {
         [inputContainerView, inputTextView, sendButton].forEach { view in
             view.tAMIC()
         }
-        
-        bottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: self.safeAreaLayoutGuide.bottomAnchor)
       
         NSLayoutConstraint.activate([
             buttonStackView.bottomAnchor.constraint(equalTo: self.safeAreaLayoutGuide.bottomAnchor),
@@ -158,42 +133,18 @@ private extension InputContainerView {
         NSLayoutConstraint.activate([
             inputContainerView.leftAnchor.constraint(equalTo: self.leftAnchor, constant: 16),
             inputContainerView.rightAnchor.constraint(equalTo: self.rightAnchor, constant: -16),
-            inputContainerView.heightAnchor.constraint(equalToConstant: 50),
-            bottomConstraint,
-
-            inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 10),
-            inputTextView.leftAnchor.constraint(equalTo: inputContainerView.leftAnchor, constant: 8),
-            inputTextView.centerYAnchor.constraint(equalTo: inputContainerView.centerYAnchor),
-            inputTextView.heightAnchor.constraint(equalToConstant: 40),
+            inputContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 50),
             
-            sendButton.leftAnchor.constraint(equalTo: inputTextView.rightAnchor, constant: 8),
+             inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 8),
+            inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
+            inputTextView.leftAnchor.constraint(equalTo: inputContainerView.leftAnchor, constant: 8),
+            inputTextView.rightAnchor.constraint(equalTo: sendButton.leftAnchor, constant: -8),
+            
             sendButton.rightAnchor.constraint(equalTo: inputContainerView.rightAnchor, constant: -8),
-            sendButton.centerYAnchor.constraint(equalTo: inputTextView.centerYAnchor),
+            sendButton.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
             sendButton.heightAnchor.constraint(equalToConstant: 36),
-            sendButton.widthAnchor.constraint(equalToConstant: 36),
-            inputTextView.rightAnchor.constraint(lessThanOrEqualTo: sendButton.leftAnchor, constant: -8)
+            sendButton.widthAnchor.constraint(equalToConstant: 36)
         ])
-    }
-    
-    func setupKeyboard() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillShow),
-            name: UIResponder.keyboardWillShowNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillHide),
-            name: UIResponder.keyboardWillHideNotification,
-            object: nil
-        )
-        
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTapOutside))
-        tap.cancelsTouchesInView = false
-        self.addGestureRecognizer(tap)
-
     }
     
     func setupInputObservers() {
@@ -220,7 +171,6 @@ private extension InputContainerView {
         [galleryButton, cameraButton, fileButton].forEach { buttonStackView.addArrangedSubview($0) }
         
         inputContainerView.isHidden = true
-        inputContainerView.backgroundColor = .clear
         
         [inputTextView, sendButton].forEach { view in
             inputContainerView.addSubview(view)

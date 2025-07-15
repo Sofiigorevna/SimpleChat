@@ -55,6 +55,10 @@ final class AttachMenuViewController: UIViewController,   UINavigationController
         super.viewDidDisappear(animated)
         selectedImages.removeAll()
     }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
     
     // MARK: - Actions
     @objc private func closeTapped() {
@@ -190,21 +194,23 @@ private extension AttachMenuViewController {
             topBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             topBarView.leftAnchor.constraint(equalTo: view.leftAnchor),
             topBarView.rightAnchor.constraint(equalTo: view.rightAnchor),
-            topBarView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            topBarView.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
 
     func setupInputContainerView() {
         view.addSubview(inputContainerView)
         inputContainerView.tAMIC()
+        
         inputContainerBottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
 
         NSLayoutConstraint.activate([
             inputContainerBottomConstraint,
-            inputContainerView.leftAnchor.constraint(equalTo: view.leftAnchor, constant: 16),
-            inputContainerView.rightAnchor.constraint(equalTo: view.rightAnchor, constant: -16),
-            inputContainerView.heightAnchor.constraint(equalToConstant: 50)
+            inputContainerView.leftAnchor.constraint(equalTo: view.leftAnchor),
+            inputContainerView.rightAnchor.constraint(equalTo: view.rightAnchor),
+        
         ])
+        view.bringSubviewToFront(inputContainerView)
     }
     
     func showGalleryGrid() {
@@ -232,11 +238,11 @@ private extension AttachMenuViewController {
         view.addSubview(collectionView)
         
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 44),
-            collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -80),
-            collectionView.leftAnchor.constraint(equalTo: view.leftAnchor, constant: 8),
-            collectionView.rightAnchor.constraint(equalTo: view.rightAnchor, constant: -8)
-        ])
+                collectionView.topAnchor.constraint(equalTo: topBarView.bottomAnchor),
+                collectionView.bottomAnchor.constraint(equalTo: inputContainerView.topAnchor),
+                collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+                collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8)
+            ])
     }
     
     func setupKeyboard() {
