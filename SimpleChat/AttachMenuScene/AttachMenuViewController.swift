@@ -11,7 +11,7 @@ import MobileCoreServices
 
 protocol AttachMenuViewControllerDelegate: AnyObject {
     func closeTappedDelegate()
-    func sendMessageDelegate()
+    func sendMessageDelegate(text: String)
     func openFileDelegate()
     func openCameraDelegate()
     func loadGalleryViewDelegate()
@@ -19,22 +19,36 @@ protocol AttachMenuViewControllerDelegate: AnyObject {
 
 final class AttachMenuViewController: UIViewController,   UINavigationControllerDelegate {
     
+    private let webSocketManager = WebSocketManager()
     private var imageAssets: [PHAsset] = []
     private var selectedIndexes: Set<IndexPath> = []
     private var collectionView: UICollectionView!
-    private var attachMenuView = AttachMenuView()
+    private var topBarView = TopBarView()
+        
+    private let inputContainerView = InputContainerView() 
+    private var inputContainerBottomConstraint: NSLayoutConstraint!
     
     private let maxSelectionLimit = 5
     private var selectedImages = [UIImage]()
-    
+    private var selectedImagesMap = [IndexPath: UIImage]()
+
+    private var newMessage: Message?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
+        topBarView.delegate = self
+        inputContainerView.delegate = self
         
-        setupAttachMenuView()
-        setupSystemAlbumsMenu()
         showGalleryGrid()
+        setupAttachMenuView()
+        setupInputContainerView()
+        setupKeyboard()
+        
         loadGalleryView()
+        setupSystemAlbumsMenu()
+        webSocketManager.delegate = self
+        webSocketManager.connect()
     }
     
     override func viewDidDisappear(_ animated: Bool) {
@@ -48,21 +62,68 @@ final class AttachMenuViewController: UIViewController,   UINavigationController
     }
     
     @objc private func sendMessage() {
-
+        guard let newMessage = newMessage else { return }
+        
+        pressToSendMessage(message: newMessage)
+        dismiss(animated: true)
+        self.newMessage = nil
+    }
+    
+    func pressToSendMessage(message: Message) {
+        NotificationCenter.default.post(
+            name: Notification.Name("pressToSendMessage"),
+            object: nil,
+            userInfo: [
+                "message": message
+            ]
+        )
+    }
+    
+    func pressToSendFileMessage(message: Message) {
+        NotificationCenter.default.post(
+            name: Notification.Name("pressToSendFileMessage"),
+            object: nil,
+            userInfo: [
+                "message": message
+            ]
+        )
+    }
+    
+    @objc private func keyboardWillShow(notification: NSNotification) {
+        guard
+            let userInfo = notification.userInfo,
+            let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+            let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+            inputContainerBottomConstraint != nil
+        else { return }
+        
+        let keyboardHeight = keyboardFrame.height - view.safeAreaInsets.bottom
+        inputContainerBottomConstraint.constant = -keyboardHeight
+        
+        UIView.animate(withDuration: duration) {
+            self.view.layoutIfNeeded()
+        }
+    }
+    
+    @objc private func keyboardWillHide(notification: NSNotification) {
+        guard
+            let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+            inputContainerBottomConstraint != nil
+        else { return }
+        
+        inputContainerBottomConstraint.constant = 0
+        
+        UIView.animate(withDuration: duration) {
+            self.view.layoutIfNeeded()
+        }
     }
     
     @objc private func openFile() {
-        let documentPicker = UIDocumentPickerViewController(documentTypes: [String(kUTTypeItem)], in: .import)
-        documentPicker.delegate = self
-        present(documentPicker, animated: true)
+        presentDocumentPicker()
     }
     
     @objc private func openCamera() {
-        guard UIImagePickerController.isSourceTypeAvailable(.camera) else { return }
-        let picker = UIImagePickerController()
-        picker.delegate = self
-        picker.sourceType = .camera
-        present(picker, animated: true)
+        presentCameraPicker()
     }
     
     @objc private func loadGalleryView() {
@@ -90,7 +151,20 @@ extension AttachMenuViewController: AttachMenuViewControllerDelegate {
         self.closeTapped()
     }
     
-    func sendMessageDelegate() {
+    func sendMessageDelegate(text: String) {
+        guard !text.isEmpty || !selectedImages.isEmpty else {
+            return
+        }
+        
+        let imagesData = selectedImages.compactMap { $0.pngData() }
+        
+         newMessage = Message(
+            text: text,
+            timestamp: Date(),
+            isFromUser: true,
+            imagesData: imagesData
+        )
+        
         self.sendMessage()
     }
     
@@ -110,30 +184,50 @@ extension AttachMenuViewController: AttachMenuViewControllerDelegate {
 // MARK: - Setup
 private extension AttachMenuViewController {
     func setupAttachMenuView() {
-        view.addSubview(attachMenuView)
-        attachMenuView.tAMIC()
-        
+        view.addSubview(topBarView)
+        topBarView.tAMIC()
         NSLayoutConstraint.activate([
-            attachMenuView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            attachMenuView.leftAnchor.constraint(equalTo: view.leftAnchor),
-            attachMenuView.rightAnchor.constraint(equalTo: view.rightAnchor),
-            attachMenuView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16),
+            topBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            topBarView.leftAnchor.constraint(equalTo: view.leftAnchor),
+            topBarView.rightAnchor.constraint(equalTo: view.rightAnchor),
+            topBarView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+        ])
+    }
+
+    func setupInputContainerView() {
+        view.addSubview(inputContainerView)
+        inputContainerView.tAMIC()
+        inputContainerBottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+
+        NSLayoutConstraint.activate([
+            inputContainerBottomConstraint,
+            inputContainerView.leftAnchor.constraint(equalTo: view.leftAnchor, constant: 16),
+            inputContainerView.rightAnchor.constraint(equalTo: view.rightAnchor, constant: -16),
+            inputContainerView.heightAnchor.constraint(equalToConstant: 50)
         ])
     }
     
     func showGalleryGrid() {
+        let spacing: CGFloat = 1
+        let itemsPerRow: CGFloat = 3
+
+        let totalSpacing = spacing * (itemsPerRow - 1)
+        let sideInsets: CGFloat = 8 * 2 // left + right
+        let screenWidth = UIScreen.main.bounds.width
+        let itemWidth = floor((screenWidth - totalSpacing - sideInsets) / itemsPerRow)
+
         let layout = UICollectionViewFlowLayout()
-        layout.itemSize = CGSize(width: 100, height: 100)
-        layout.minimumInteritemSpacing = 4
-        layout.minimumLineSpacing = 4
-        
+        layout.itemSize = CGSize(width: itemWidth, height: itemWidth)
+        layout.minimumInteritemSpacing = spacing
+        layout.minimumLineSpacing = spacing
+
         collectionView?.removeFromSuperview()
         collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.register(GalleryCell.self, forCellWithReuseIdentifier: GalleryCell.description())
-        
+
         collectionView.tAMIC()
         view.addSubview(collectionView)
         
@@ -143,6 +237,22 @@ private extension AttachMenuViewController {
             collectionView.leftAnchor.constraint(equalTo: view.leftAnchor, constant: 8),
             collectionView.rightAnchor.constraint(equalTo: view.rightAnchor, constant: -8)
         ])
+    }
+    
+    func setupKeyboard() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillShow),
+            name: UIResponder.keyboardWillShowNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillHide),
+            name: UIResponder.keyboardWillHideNotification,
+            object: nil
+        )
     }
 }
 // MARK: - PHPhotoLibrary
@@ -189,9 +299,9 @@ private extension AttachMenuViewController {
             }
             
             DispatchQueue.main.async {
-                self.attachMenuView.albumButtonSettingMenu(title: "Системные альбомы", actions: actions)
+                self.topBarView.albumButtonSettingMenu(title: "Системные альбомы", actions: actions)
                 if let firstAction = actions.first {
-                    self.attachMenuView.albumButtonSetting(title: firstAction.title)
+                    self.topBarView.albumButtonSetting(title: firstAction.title)
                     // Загрузить фото из первого альбома по умолчанию
                     if let firstCollection = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .smartAlbumUserLibrary, options: nil).firstObject {
                         self.getPhotosFromAlbum(firstCollection)
@@ -216,10 +326,16 @@ private extension AttachMenuViewController {
         DispatchQueue.main.async {
             self.imageAssets = newAssets
             self.selectedIndexes.removeAll()
-            self.attachMenuView.albumButtonSetting(title: album.localizedTitle ?? "Альбом")
+            self.topBarView.albumButtonSetting(title: album.localizedTitle ?? "Альбом")
             self.collectionView.reloadData()
             self.toggleInputContainerView()
         }
+    }
+}
+// MARK: - UIScrollViewDelegate
+extension AttachMenuViewController: UIScrollViewDelegate {
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        inputContainerView.endEditing(true)
     }
 }
 // MARK: - UICollectionViewDataSource
@@ -229,7 +345,7 @@ extension AttachMenuViewController: UICollectionViewDataSource, UICollectionView
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cell", for: indexPath) as! GalleryCell
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: GalleryCell.description(), for: indexPath) as! GalleryCell
         let asset = imageAssets[indexPath.item]
         cell.representedAssetIdentifier = asset.localIdentifier
         cell.setSelected(selectedIndexes.contains(indexPath))
@@ -246,40 +362,218 @@ extension AttachMenuViewController: UICollectionViewDataSource, UICollectionView
     }
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let asset = imageAssets[indexPath.item]
+
         if selectedIndexes.contains(indexPath) {
             selectedIndexes.remove(indexPath)
+            selectedImagesMap.removeValue(forKey: indexPath)
         } else {
             guard selectedIndexes.count < 5 else {
                 let alert = UIAlertController(title: "Лимит", message: "Можно выбрать не более 5 изображений", preferredStyle: .alert)
                 alert.addAction(UIAlertAction(title: "ОК", style: .default))
                 present(alert, animated: true)
                 return
-            } // ограничение в 5 штук
+            }
+
             selectedIndexes.insert(indexPath)
+
+            PHImageManager.default().requestImage(for: asset,
+                                                  targetSize: PHImageManagerMaximumSize,
+                                                  contentMode: .aspectFill,
+                                                  options: nil) { [weak self] image, _ in
+                guard let self = self, let image = image else { return }
+                self.selectedImagesMap[indexPath] = image
+                self.selectedImages = Array(self.selectedImagesMap.values)
+            }
         }
+
         collectionView.reloadItems(at: [indexPath])
         toggleInputContainerView()
     }
     
     func toggleInputContainerView() {
         let hasSelection = !selectedIndexes.isEmpty
-        attachMenuView.toggleInput(isSelection: hasSelection, selectedCount: selectedIndexes.count)
+        inputContainerView.toggleInput(isSelection: hasSelection)
+        topBarView.toggleInput(isSelection: hasSelection, selectedCount: selectedIndexes.count)
     }
 }
 // MARK: - UIDocumentPickerDelegate
 extension AttachMenuViewController: UIDocumentPickerDelegate {
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        // handle picked file
-    }
-}
-// MARK: - UIImagePickerControllerDelegate
-extension AttachMenuViewController: UIImagePickerControllerDelegate {
-    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-        dismiss(animated: true)
-        if let image = info[.originalImage] as? UIImage {
-            print("Снято фото: \(image)")
+        func presentDocumentPicker() {
+            // Выбор типов документов (например, все виды файлов)
+            let supportedTypes: [UTType] = [UTType.item]
+            
+            let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: supportedTypes, asCopy: true)
+            documentPicker.delegate = self
+            documentPicker.allowsMultipleSelection = false // или true, если нужно
+            
+            present(documentPicker, animated: true, completion: nil)
+        }
+        
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let selectedFileURL = urls.first else { return }
+            do {
+                let docData = try Data(contentsOf: selectedFileURL)
+                let content = WebSocketContent.document(
+                    data: docData,
+                    fileName: selectedFileURL.lastPathComponent,
+                    mimeType: mimeType(for: selectedFileURL)
+                )
+                webSocketManager.send(content: content)
+                
+                let documentData = Document(data: docData, fileName: selectedFileURL.lastPathComponent, mimeType: mimeType(for: selectedFileURL))
+                
+                let newMessage = Message(
+                    text: "",
+                    timestamp: Date(),
+                    isFromUser: true,
+                    imagesData: nil,
+                    documentData: documentData
+                )
+                
+                pressToSendFileMessage(message: newMessage)
+                self.closeTapped()
+            } catch {
+                print("Ошибка при чтении файла: \(error.localizedDescription)")
+                showFileReadErrorAlert(error: error)
+            }
+        }
+        
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            print("Выбор файла отменён")
+        }
+        
+        func mimeType(for url: URL) -> String {
+            let ext = url.pathExtension
+            guard let utType = UTType(filenameExtension: ext),
+                  let mimeType = utType.preferredMIMEType else {
+                return "application/octet-stream"
+            }
+            return mimeType
+        }
+        
+        func showFileReadErrorAlert(error: Error) {
+            let alert = UIAlertController(
+                title: "Ошибка",
+                message: "Не удалось прочитать файл: \(error.localizedDescription)",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "ОК", style: .default))
+            present(alert, animated: true)
         }
     }
+
+// MARK: - UIImagePickerControllerDelegate (Camera)
+extension AttachMenuViewController: UIImagePickerControllerDelegate {
+    func presentCameraPicker() {
+        let cameraAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
+        
+        switch cameraAuthorizationStatus {
+            case .authorized:
+                // Доступ к камере уже предоставлен, открываем камеру
+                showCameraPicker()
+            case .notDetermined:
+                // Запрос разрешения на использование камеры
+                AVCaptureDevice.requestAccess(for: .video) { granted in
+                    DispatchQueue.main.async {
+                        if granted {
+                            self.showCameraPicker()
+                        } else {
+                            self.showCameraPermissionDeniedAlert()
+                        }
+                    }
+                }
+            case .denied, .restricted:
+                // Доступ к камере запрещён, показываем алерт с предложением изменить настройки
+                showCameraPermissionDeniedAlert()
+            @unknown default:
+                break
+        }
+    }
+    
+    /// Метод для открытия камеры
+    func showCameraPicker() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            return
+        }
+        let imagePicker = UIImagePickerController()
+        imagePicker.sourceType = .camera
+        imagePicker.delegate = self
+        imagePicker.allowsEditing = true
+        
+        present(imagePicker, animated: true)
+    }
+    
+    /// Метод для показа алерта при отсутствии разрешения
+    func showCameraPermissionDeniedAlert() {
+        let alert = UIAlertController(
+            title: SettingsGallery.accessIsDeniedCameraTitle,
+            message: SettingsGallery.accessIsDeniedCameraMessage,
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: SettingsGallery.settingsTitleButton, style: .default) { _ in
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsURL)
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: SettingsGallery.cancelTitleButton, style: .cancel, handler: nil))
+        
+        present(alert, animated: true)
+    }
+    
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+        picker.dismiss(animated: true)
+        
+        guard let image = info[.originalImage] as? UIImage, let _ = image.pngData() else {
+            return
+        }
+        if selectedImages.count < maxSelectionLimit {
+            self.selectedImages = [image]
+        } else {
+            showLimitExceededAlert()
+        }
+    }
+    
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true)
+    }
+}
+// MARK: - Private methods
+private extension AttachMenuViewController {
+     func showLimitExceededAlert() {
+        let alertController = UIAlertController(
+            title: SettingsGallery.attentionTitleButton,
+            message: SettingsGallery.faildPhotoLimit10,
+            preferredStyle: .alert
+        )
+        
+        // Кнопка "Отмена"
+        alertController.addAction(UIAlertAction(title: SettingsGallery.cancelTitleButton, style: .cancel))
+        
+        // Кнопка "Понятно"
+        alertController.addAction(UIAlertAction(title: SettingsGallery.clearTitleButton, style: .default))
+        
+        // Показываем alert
+        self.present(alertController, animated: true)
+    }
+    
+     func isImageDuplicate(_ image: UIImage) -> Bool {
+        for selectedImage in selectedImages {
+            if selectedImage.pngData() == image.pngData() {
+                return true
+            }
+        }
+        return false
+    }
+}
+// MARK: - WebSocketManagerDelegate
+extension AttachMenuViewController: WebSocketManagerDelegate {
+    
+    func didReceiveContent(_ message: WebSocketContent) { }
+    
+    func didEncounterError(_ error: String) { }
 }
 
 // MARK: - Entry Point from Paperclip Button
