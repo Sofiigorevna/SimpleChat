@@ -12,7 +12,7 @@ final class InputContainerView: UIView {
     private let inputContainerView = UIView()
     private let inputTextView = UITextView()
     private let sendButton = UIButton(type: .system)
-    private var bottomConstraint: NSLayoutConstraint!
+    private var textViewHeightConstraint: NSLayoutConstraint!
 
     weak var delegate: AttachMenuViewControllerDelegate?
     
@@ -80,42 +80,13 @@ final class InputContainerView: UIView {
         inputTextView.isScrollEnabled = size.height > maxHeight
         
         // Находим constraint высоты поля ввода и меняем его значение
-        if let heightConstraint = inputTextView.constraints.first(where: { $0.firstAttribute == .height }) {
-            heightConstraint.constant = newHeight
-        }
+//        if let heightConstraint = inputTextView.constraints.first(where: { $0.firstAttribute == .height }) {
+//            heightConstraint.constant = newHeight
+//        }
+        textViewHeightConstraint.constant = newHeight
         
         // Анимируем изменение layout, чтобы изменение высоты выглядело плавно.
         UIView.animate(withDuration: 0.2) {
-            self.layoutIfNeeded()
-        }
-    }
-    
-    @objc private func keyboardWillShow(notification: NSNotification) {
-        guard
-            let userInfo = notification.userInfo,
-            let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-            let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
-        else { return }
-
-        // Преобразуем frame клавиатуры в координаты AttachMenuView
-        let keyboardFrameInView = self.convert(keyboardFrame, from: nil)
-        let overlap = self.bounds.maxY - keyboardFrameInView.minY
-
-        bottomConstraint.constant = -max(overlap, 0)
-        UIView.animate(withDuration: duration) {
-            self.layoutIfNeeded()
-        }
-    }
-    
-    @objc private func keyboardWillHide(notification: NSNotification) {
-        guard
-            let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
-            bottomConstraint != nil
-        else { return }
-        
-        bottomConstraint.constant = 0
-        
-        UIView.animate(withDuration: duration) {
             self.layoutIfNeeded()
         }
     }
@@ -137,7 +108,6 @@ private extension InputContainerView {
         setupAttachMenu()
         setupInputTextView()
         setupButtons()
-        setupKeyboard()
         setupInputObservers()
     }
     
@@ -145,9 +115,10 @@ private extension InputContainerView {
         [inputContainerView, inputTextView, sendButton].forEach { view in
             view.tAMIC()
         }
-        
-        bottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: self.safeAreaLayoutGuide.bottomAnchor)
       
+        textViewHeightConstraint = inputTextView.heightAnchor.constraint(equalToConstant: 40)
+        textViewHeightConstraint.isActive = true
+
         NSLayoutConstraint.activate([
             buttonStackView.bottomAnchor.constraint(equalTo: self.safeAreaLayoutGuide.bottomAnchor),
             buttonStackView.leftAnchor.constraint(equalTo: self.leftAnchor, constant: 16),
@@ -156,44 +127,25 @@ private extension InputContainerView {
         ])
         
         NSLayoutConstraint.activate([
+            inputContainerView.topAnchor.constraint(equalTo: self.topAnchor),
             inputContainerView.leftAnchor.constraint(equalTo: self.leftAnchor, constant: 16),
             inputContainerView.rightAnchor.constraint(equalTo: self.rightAnchor, constant: -16),
-            inputContainerView.heightAnchor.constraint(equalToConstant: 50),
-            bottomConstraint,
+            inputContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 50),
 
             inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 10),
             inputTextView.leftAnchor.constraint(equalTo: inputContainerView.leftAnchor, constant: 8),
-            inputTextView.centerYAnchor.constraint(equalTo: inputContainerView.centerYAnchor),
-            inputTextView.heightAnchor.constraint(equalToConstant: 40),
+            inputTextView.rightAnchor.constraint(equalTo: sendButton.leftAnchor, constant: -8),
+            inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
+
             
             sendButton.leftAnchor.constraint(equalTo: inputTextView.rightAnchor, constant: 8),
             sendButton.rightAnchor.constraint(equalTo: inputContainerView.rightAnchor, constant: -8),
-            sendButton.centerYAnchor.constraint(equalTo: inputTextView.centerYAnchor),
+            sendButton.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
+
             sendButton.heightAnchor.constraint(equalToConstant: 36),
             sendButton.widthAnchor.constraint(equalToConstant: 36),
             inputTextView.rightAnchor.constraint(lessThanOrEqualTo: sendButton.leftAnchor, constant: -8)
         ])
-    }
-    
-    func setupKeyboard() {
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillShow),
-            name: UIResponder.keyboardWillShowNotification,
-            object: nil
-        )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(keyboardWillHide),
-            name: UIResponder.keyboardWillHideNotification,
-            object: nil
-        )
-        
-        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTapOutside))
-        tap.cancelsTouchesInView = false
-        self.addGestureRecognizer(tap)
-
     }
     
     func setupInputObservers() {
