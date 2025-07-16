@@ -44,10 +44,18 @@ final class TopBarView: UIView {
     }
     
     func albumButtonSetting(title: String) {
-        self.albumButton.setTitle("\(title) ▼", for: .normal)
-        self.albumButton.titleColor(for: .normal)
-        self.albumButton.titleLabel?.textColor = .label
+        self.albumButton.setTitle(title, for: .normal)
+        
+        let chevronImage = UIImage(systemName: "chevron.down")
+        self.albumButton.setImage(chevronImage, for: .normal)
+        
+        self.albumButton.semanticContentAttribute = .forceRightToLeft
+        self.albumButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
+        
+        self.albumButton.setTitleColor(.label, for: .normal)
+        self.albumButton.tintColor = .label
     }
+
     
     func albumButtonSettingMenu(title: String, actions: [UIAction]) {
         self.albumButton.menu = UIMenu(title:title, children: actions)

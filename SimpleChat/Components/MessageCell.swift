@@ -171,7 +171,7 @@ private extension MessageCell {
     }
     
     func setupBubbleView() {
-        bubbleView.layer.cornerRadius = 12
+        bubbleView.layer.cornerRadius = 14
         bubbleView.clipsToBounds = true
     }
     

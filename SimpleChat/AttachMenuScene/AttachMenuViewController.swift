@@ -268,24 +268,32 @@ private extension AttachMenuViewController {
             guard let self = self, status == .authorized || status == .limited else { return }
             
             var actions: [UIAction] = []
+            let fetchOptions = PHFetchOptions()
+            fetchOptions.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.image.rawValue)
             
             // Пример: "Недавние"
             if let recents = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .smartAlbumUserLibrary, options: nil).firstObject {
-                let action = UIAction(title: recents.localizedTitle ?? "Недавние") { _ in
-                    self.getPhotosFromAlbum(recents)
+                let assets = PHAsset.fetchAssets(in: recents, options: fetchOptions)
+                if assets.count > 0 {
+                    let action = UIAction(title: "Недавние") { _ in
+                        self.getPhotosFromAlbum(recents)
+                    }
+                    actions.append(action)
                 }
-                actions.append(action)
             }
             
             // "Избранное"
             if let favorites = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .smartAlbumFavorites, options: nil).firstObject {
-                let action = UIAction(title: favorites.localizedTitle ?? "Избранное") { _ in
-                    self.getPhotosFromAlbum(favorites)
+                let assets = PHAsset.fetchAssets(in: favorites, options: fetchOptions)
+                if assets.count > 0 {
+                    let action = UIAction(title: "Избранное") { _ in
+                        self.getPhotosFromAlbum(favorites)
+                    }
+                    actions.append(action)
                 }
-                actions.append(action)
             }
             
-            // Другие системные смарт-альбомы, например, можно перечислить нужные подтипы:
+            // Другие системные альбомы
             let wantedSubtypes: [PHAssetCollectionSubtype] = [
                 .smartAlbumSelfPortraits,
                 .smartAlbumScreenshots,
@@ -295,11 +303,14 @@ private extension AttachMenuViewController {
             for subtype in wantedSubtypes {
                 let collections = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: subtype, options: nil)
                 collections.enumerateObjects { collection, _, _ in
-                    if let title = collection.localizedTitle {
-                        let action = UIAction(title: title) { _ in
-                            self.getPhotosFromAlbum(collection)
+                    let assets = PHAsset.fetchAssets(in: collection, options: fetchOptions)
+                    if assets.count > 0 {
+                        if let title = collection.localizedTitle {
+                            let action = UIAction(title: title) { _ in
+                                self.getPhotosFromAlbum(collection)
+                            }
+                            actions.append(action)
                         }
-                        actions.append(action)
                     }
                 }
             }
@@ -308,15 +319,22 @@ private extension AttachMenuViewController {
                 self.topBarView.albumButtonSettingMenu(title: "Системные альбомы", actions: actions)
                 if let firstAction = actions.first {
                     self.topBarView.albumButtonSetting(title: firstAction.title)
-                    // Загрузить фото из первого альбома по умолчанию
+                    // Загрузить фото из первого непустого альбома по умолчанию
                     if let firstCollection = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .smartAlbumUserLibrary, options: nil).firstObject {
-                        self.getPhotosFromAlbum(firstCollection)
+                        let assets = PHAsset.fetchAssets(in: firstCollection, options: fetchOptions)
+                        if assets.count > 0 {
+                            self.getPhotosFromAlbum(firstCollection)
+                        } else if let firstNonEmptyCollection = actions.compactMap({ action -> PHAssetCollection? in
+                            return nil
+                        }).first {
+                            self.getPhotosFromAlbum(firstNonEmptyCollection)
+                        }
                     }
                 }
             }
         }
     }
-    
+
     func getPhotosFromAlbum(_ album: PHAssetCollection) {
         let fetchOptions = PHFetchOptions()
         fetchOptions.predicate = NSPredicate(format: "mediaType = %d", PHAssetMediaType.image.rawValue)

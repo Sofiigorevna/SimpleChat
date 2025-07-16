@@ -120,27 +120,7 @@ private extension InputContainerView {
             buttonStackView.rightAnchor.constraint(equalTo: self.rightAnchor, constant: -16),
             buttonStackView.heightAnchor.constraint(equalToConstant: 50)
         ])
-        
-//        NSLayoutConstraint.activate([
-//            inputContainerView.topAnchor.constraint(equalTo: self.topAnchor),
-//            inputContainerView.leftAnchor.constraint(equalTo: self.leftAnchor, constant: 16),
-//            inputContainerView.rightAnchor.constraint(equalTo: self.rightAnchor, constant: -16),
-//            inputContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 50),
-//
-//            inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 10),
-//            inputTextView.leftAnchor.constraint(equalTo: inputContainerView.leftAnchor, constant: 8),
-//            inputTextView.rightAnchor.constraint(equalTo: sendButton.leftAnchor, constant: -8),
-//            inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
-//
-//            
-//            sendButton.leftAnchor.constraint(equalTo: inputTextView.rightAnchor, constant: 8),
-//            sendButton.rightAnchor.constraint(equalTo: inputContainerView.rightAnchor, constant: -8),
-//            sendButton.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -8),
-//
-//            sendButton.heightAnchor.constraint(equalToConstant: 36),
-//            sendButton.widthAnchor.constraint(equalToConstant: 36),
-//            inputTextView.rightAnchor.constraint(lessThanOrEqualTo: sendButton.leftAnchor, constant: -8)
-//        ])
+    
         NSLayoutConstraint.activate([
             inputContainerView.topAnchor.constraint(equalTo: self.topAnchor),
             inputContainerView.leftAnchor.constraint(equalTo: self.leftAnchor, constant: 16),
@@ -157,7 +137,6 @@ private extension InputContainerView {
             sendButton.widthAnchor.constraint(equalToConstant: 36),
             sendButton.heightAnchor.constraint(equalToConstant: 36)
         ])
-
     }
     
     func setupInputObservers() {
