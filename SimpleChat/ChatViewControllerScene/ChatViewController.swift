@@ -499,7 +499,7 @@ private extension ChatViewController {
             inputTextView.rightAnchor.constraint(equalTo: sendButton.leftAnchor, constant: -8),
             inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -12),
             inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 12),
-            inputTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 40)
+           // inputTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 40)
         ])
         
         NSLayoutConstraint.activate([

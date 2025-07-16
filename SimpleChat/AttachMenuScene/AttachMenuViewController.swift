@@ -202,12 +202,11 @@ private extension AttachMenuViewController {
         view.addSubview(inputContainerView)
         inputContainerView.tAMIC()
         inputContainerBottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
-        
+
         NSLayoutConstraint.activate([
             inputContainerBottomConstraint,
-            inputContainerView.leftAnchor.constraint(equalTo: view.leftAnchor, constant: 16),
-            inputContainerView.rightAnchor.constraint(equalTo: view.rightAnchor, constant: -16),
-            inputContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 50)
+            inputContainerView.leftAnchor.constraint(equalTo: view.leftAnchor),
+            inputContainerView.rightAnchor.constraint(equalTo: view.rightAnchor),
         ])
         
         view.bringSubviewToFront(inputContainerView)
