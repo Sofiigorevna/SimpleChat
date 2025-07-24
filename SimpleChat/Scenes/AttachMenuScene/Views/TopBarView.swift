@@ -45,29 +45,29 @@ final class TopBarView: UIView {
     
     func albumButtonSetting(title: String) {
         self.albumButton.setTitle(title, for: .normal)
-        
-        let chevronImage = UIImage(systemName: "chevron.down")
+        let sendConfig = UIImage.SymbolConfiguration(pointSize: 12, weight: .regular)
+        let chevronImage = UIImage(systemName: "chevron.down", withConfiguration: sendConfig)
         self.albumButton.setImage(chevronImage, for: .normal)
         
         self.albumButton.semanticContentAttribute = .forceRightToLeft
         self.albumButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
         
-        self.albumButton.setTitleColor(.label, for: .normal)
-        self.albumButton.tintColor = .label
+        self.albumButton.setTitleColor(.white, for: .normal)
+        self.albumButton.tintColor = .white
     }
 
     
     func albumButtonSettingMenu(title: String, actions: [UIAction]) {
-        self.albumButton.menu = UIMenu(title:title, children: actions)
+        self.albumButton.menu = UIMenu(title: title, children: actions)
         self.albumButton.showsMenuAsPrimaryAction = true
-        self.albumButton.titleLabel?.textColor = .label
+        self.albumButton.titleLabel?.textColor = .white
     }
 }
 
 // MARK: - Setup
 private extension TopBarView {
     func setupHierarchy() {
-        self.backgroundColor = .systemBackground
+        self.backgroundColor = Colours.deepBlack.color
         
         [topBar].forEach { view in
             self.addSubview(view)
@@ -116,8 +116,8 @@ private extension TopBarView {
     }
     func setupTopBar() {
         closeButton.setTitle("Закрыть", for: .normal)
-        closeButton.titleLabel?.textColor = .black
-        closeButton.setTitleColor(.label, for: .normal)
+        closeButton.titleLabel?.textColor = Colours.primaryAccent.color
+        closeButton.setTitleColor(Colours.primaryAccent.color, for: .normal)
         closeButton.titleLabel?.font = .systemFont(ofSize: 15)
         
         closeButton.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
@@ -128,7 +128,7 @@ private extension TopBarView {
     }
     
     func setupSelectedCountView() {
-        selectedCountView.backgroundColor = .label
+        selectedCountView.backgroundColor = Colours.primaryAccent.color
         selectedCountView.layer.cornerRadius = 12
         selectedCountView.isHidden = true
         

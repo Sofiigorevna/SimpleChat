@@ -23,7 +23,7 @@ final class GalleryCell: UICollectionViewCell {
 
         checkmark.frame = CGRect(x: contentView.bounds.width - 24, y: 4, width: 20, height: 20)
         checkmark.layer.cornerRadius = 10
-        checkmark.backgroundColor = UIColor.darkGray.withAlphaComponent(0.8)
+        checkmark.backgroundColor = Colours.primaryAccent.color
         checkmark.layer.borderWidth = 2
         checkmark.layer.borderColor = UIColor.white.cgColor
         checkmark.isHidden = true

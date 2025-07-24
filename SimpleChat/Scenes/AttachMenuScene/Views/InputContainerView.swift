@@ -155,9 +155,9 @@ private extension InputContainerView {
         buttonStackView.spacing = 12
         buttonStackView.translatesAutoresizingMaskIntoConstraints = false
         
-        let galleryButton = makeButton(title: "Галерея", iconSystemName: "photo.on.rectangle", action: #selector(loadGalleryView))
-        let cameraButton = makeButton(title: "Камера", iconSystemName: "camera", action: #selector(openCamera))
-        let fileButton = makeButton(title: "Файл", iconSystemName: "folder.fill.badge.plus", action: #selector(openFile))
+        let galleryButton = makeButton(title: "", iconSystemName: "photo.on.rectangle", action: #selector(loadGalleryView))
+        let cameraButton = makeButton(title: "", iconSystemName: "camera", action: #selector(openCamera))
+        let fileButton = makeButton(title: "", iconSystemName: "folder.fill.badge.plus", action: #selector(openFile))
         
         [galleryButton, cameraButton, fileButton].forEach { buttonStackView.addArrangedSubview($0) }
         
@@ -171,17 +171,13 @@ private extension InputContainerView {
     
     func makeButton(title: String, iconSystemName: String, action: Selector) -> UIButton {
         let button = UIButton()
-        let sendConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        let sendConfig = UIImage.SymbolConfiguration(pointSize: 28, weight: .regular)
         let sendIcon = UIImage(systemName: iconSystemName, withConfiguration: sendConfig)
         button.setImage(sendIcon, for: .normal)
         button.setTitleColor(.white, for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 17)
-
         button.setTitle(title, for: .normal)
-        button.layer.cornerRadius = 12
-        button.backgroundColor = .darkGray
         button.tintColor = Colours.primaryAccent.color
-
         button.addTarget(self, action: action, for: .touchUpInside)
         return button
     }
