@@ -11,15 +11,13 @@ final class ChatViewController: UIViewController {
     private let webSocketManager = WebSocketManager()
     private var messages: [ChatItem] = []
     private var dataSource: UITableViewDiffableDataSource<Int, ChatItem>!
-    private var bottomConstraint: NSLayoutConstraint!
+    
+    private var inputContainerBottomConstraint: NSLayoutConstraint!
     
     private var activityIndicator = UIActivityIndicatorView()
     private var tableView = UITableView()
-    private let inputTextView = UITextView()
-    private var sendButton = UIButton()
-    private var attachmentButton = UIButton()
     private let dateOverlayLabel = UILabel()
-    private let inputContainerView = UIView()
+    private let inputContainerView = MainInputContainerView()
     
     private let dateFormatter: DateFormatter = {
         let df = DateFormatter()
@@ -31,13 +29,14 @@ final class ChatViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupView()
-        
+        inputContainerView.delegate = self
         setupDataSource()
-    
+        
         setupKeyboard()
-        setupInputObservers()
         webSocketManager.delegate = self
         webSocketManager.connect()
+        loadMessages()
+        updateSnapshot()
         
         NotificationCenter.default.addObserver(
             self,
@@ -53,19 +52,12 @@ final class ChatViewController: UIViewController {
             object: nil
         )
     }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        loadMessages()
-        updateSnapshot()
-    }
     
     @objc private func pressToSendFileMessage(_ notification: Notification) {
         if let newMessage = notification.userInfo?["message"] as? Message {
             messages.append(.message(newMessage))
             updateSnapshot()
             activityIndicator.stopAnimating()
-            handleTextChange()
             saveMessages()
         }
     }
@@ -74,7 +66,7 @@ final class ChatViewController: UIViewController {
         if let newMessage = notification.userInfo?["message"] as? Message {
             if let text = newMessage.text,
                let selectedImages = newMessage.images {
-    
+                
                 guard !text.isEmpty || !selectedImages.isEmpty else { return }
                 let imagesData = selectedImages.compactMap { $0.pngData()}
                 
@@ -88,51 +80,13 @@ final class ChatViewController: UIViewController {
                 messages.append(.message(newMessage))
                 updateSnapshot()
                 webSocketManager.sendTextAndImage(text: text, imageData: imagesData)
-                inputTextView.text = ""
+                inputContainerView.prepare()
                 saveMessages()
-                handleTextChange()
             }
         }
     }
     
-    @objc private func handleTextChange() {
-        let maxHeight: CGFloat = 100   // Максимальная высота поля ввода
-        let minHeight: CGFloat = 40    // Минимальная высота поля ввода
-        
-        // Получаем ширину поля ввода.
-        // Если ширина ещё не известна (например, при первом запуске), используем запасной вариант.
-        let width = inputTextView.frame.width > 0
-        ? inputTextView.frame.width
-        : UIScreen.main.bounds.width - 100
-        
-        // Рассчитываем, какой размер (высоту) нужно занять, чтобы вместить весь текст,
-        // при ширине, заданной выше, и неограниченной высоте.
-        let size = inputTextView.sizeThatFits(
-            CGSize(width: width, height: .greatestFiniteMagnitude)
-        )
-        
-        // Ограничиваем высоту поля минимальной и максимальной высотой.
-        // Таким образом, поле не станет меньше 40 и не больше 100.
-        let newHeight = min(max(size.height, minHeight), maxHeight)
-        
-        // Если высота текста больше максимума — включаем прокрутку.
-        // Иначе — прокрутка выключена, поле расширяется.
-        inputTextView.isScrollEnabled = size.height > maxHeight
-        
-        // Находим constraint высоты поля ввода и меняем его значение
-        if let heightConstraint = inputTextView.constraints.first(where: { $0.firstAttribute == .height }) {
-            heightConstraint.constant = newHeight
-        }
-        
-        // Анимируем изменение layout, чтобы изменение высоты выглядело плавно.
-        UIView.animate(withDuration: 0.2) {
-            self.view.layoutIfNeeded()
-        }
-    }
-    
-    @objc private func sendMessage() {
-        let text = inputTextView.text.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+    @objc private func sendMessage(text: String) {
         guard !text.isEmpty  else { return }
         
         let newMessage = Message(
@@ -145,11 +99,10 @@ final class ChatViewController: UIViewController {
         messages.append(.message(newMessage))
         updateSnapshot()
         webSocketManager.sendTextAndImage(text: text, imageData: [])
-        inputTextView.text = ""
+        inputContainerView.prepare()
         saveMessages()
-        handleTextChange()
     }
-
+    
     @objc private func setAttachmentFile() {
         presentAttachMenu()
     }
@@ -159,11 +112,11 @@ final class ChatViewController: UIViewController {
             let userInfo = notification.userInfo,
             let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
             let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
-            bottomConstraint != nil
+            inputContainerBottomConstraint != nil
         else { return }
         
         let keyboardHeight = keyboardFrame.height - view.safeAreaInsets.bottom
-        bottomConstraint.constant = -keyboardHeight
+        inputContainerBottomConstraint.constant = -keyboardHeight
         
         UIView.animate(withDuration: duration) {
             self.view.layoutIfNeeded()
@@ -173,10 +126,10 @@ final class ChatViewController: UIViewController {
     @objc private func keyboardWillHide(notification: NSNotification) {
         guard
             let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
-            bottomConstraint != nil
+            inputContainerBottomConstraint != nil
         else { return }
         
-        bottomConstraint.constant = 0
+        inputContainerBottomConstraint.constant = 0
         
         UIView.animate(withDuration: duration) {
             self.view.layoutIfNeeded()
@@ -184,7 +137,7 @@ final class ChatViewController: UIViewController {
     }
     
     @objc private func handleScrollViewTap() {
-        inputTextView.becomeFirstResponder()
+        inputContainerView.handleTapOutside()
     }
 }
 
@@ -268,15 +221,67 @@ extension ChatViewController: UITableViewDelegate {
 // MARK: - setupView
 private extension ChatViewController {
     func setupView() {
+        setupNavBar()
         setupTableView()
-        setupInputTextView()
         setapLabel()
-        setupButtons()
         setupActivityIndicator()
+        setupBackgroundImage()
         
-        view.subviewsOnView(tableView,inputContainerView, activityIndicator, dateOverlayLabel)
-        inputContainerView.subviewsOnView(attachmentButton, inputTextView, sendButton)
+        view.subviewsOnView(
+            tableView,
+            inputContainerView,
+            activityIndicator,
+            dateOverlayLabel)
         setupConstraints()
+    }
+    
+    func setupNavBar() {
+        navigationController?.navigationBar.isTranslucent = false
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .black
+        
+        // 1. базовый шрифт
+        let baseFont = UIFont.systemFont(ofSize: 17, weight: .semibold)
+        
+        // 2. Масштабируем его через UIFontMetrics (если нужно поддержать Dynamic Type)
+        let scaledFont = UIFontMetrics(forTextStyle: .headline).scaledFont(for: baseFont)
+        
+        // 3. Применяем к заголовку
+        appearance.titleTextAttributes = [
+            .foregroundColor: UIColor.white,
+            .font: scaledFont
+        ]
+        
+        navigationController?.navigationBar.standardAppearance = appearance
+        navigationController?.navigationBar.scrollEdgeAppearance = appearance
+        
+        title = "Чат"
+    }
+    
+    func setupBackgroundImage() {
+        let backgroundImage = UIImageView(frame: view.bounds)
+        backgroundImage.image = UIImage(named: "background")
+        backgroundImage.contentMode = .scaleAspectFill
+        backgroundImage.clipsToBounds = true
+        
+        // Создаем основной черный фон
+        let blackBackground = UIView(frame: view.bounds)
+        blackBackground.backgroundColor = .black
+        view.addSubview(blackBackground)
+        
+        // Добавляем изображение поверх черного фона
+        view.addSubview(backgroundImage)
+        backgroundImage.alpha = 0.8
+        
+        // Добавляем дополнительный overlay
+        let overlay = UIView(frame: view.bounds)
+        view.addSubview(overlay)
+        
+        // Убедимся, что все фоновые элементы находятся позади контента
+        view.sendSubviewToBack(overlay)
+        view.sendSubviewToBack(backgroundImage)
+        view.sendSubviewToBack(blackBackground)
     }
     
     func setapLabel() {
@@ -290,7 +295,7 @@ private extension ChatViewController {
     }
     
     func setupTableView() {
-        tableView.backgroundColor = .systemBackground
+        tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 80
@@ -298,32 +303,6 @@ private extension ChatViewController {
         tableView.register(MessageCell.self, forCellReuseIdentifier: MessageCell.description())
         tableView.register(DateCell.self, forCellReuseIdentifier: DateCell.description())
         tableView.delegate = self
-    }
-    
-    func setupInputTextView() {
-        inputTextView.font = .systemFont(ofSize: 16)
-        inputTextView.layer.cornerRadius = 14
-        inputTextView.layer.borderWidth = 1
-        inputTextView.layer.borderColor = UIColor.systemGray4.cgColor
-        inputTextView.isScrollEnabled = false
-        inputTextView.textContainerInset = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
-    }
-    
-    func setupButtons() {
-        let sendConfig = UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)
-        let sendIcon = UIImage(systemName: "arrowshape.up.circle.fill", withConfiguration: sendConfig)
-        
-        sendButton.setImage(sendIcon, for: .normal)
-        sendButton.tintColor = .darkGray
-        sendButton.backgroundColor = .clear
-        sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
-        
-        let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .light)
-        let paperclipIcon = UIImage(systemName: "paperclip", withConfiguration: config)
-        attachmentButton.setImage(paperclipIcon, for: .normal)
-        attachmentButton.tintColor = .darkGray
-        attachmentButton.backgroundColor = .clear
-        attachmentButton.addTarget(self, action: #selector(setAttachmentFile), for: .touchUpInside)
     }
     
     func setupActivityIndicator() {
@@ -337,6 +316,12 @@ private extension ChatViewController {
                 case .message(let message):
                     let cell = tableView.dequeueReusableCell(withIdentifier: MessageCell.description(), for: indexPath) as! MessageCell
                     cell.configure(with: message, dateFormatter: self?.dateFormatter ?? DateFormatter())
+                   
+                    cell.onImageSelected = { [weak self] images, index in
+                        let vc = ImageItemViewController(imageURLs: images, initialIndex: index)
+                        self?.navigationController?.pushViewController(vc, animated: true)
+                    }
+                    cell.backgroundView?.backgroundColor = .clear
                     return cell
                 case .date(let date):
                     let cell = tableView.dequeueReusableCell(withIdentifier: DateCell.description(), for: indexPath) as! DateCell
@@ -373,16 +358,6 @@ private extension ChatViewController {
         dataSource.apply(snapshot, animatingDifferences: true) { [weak self] in
             self?.scrollToBottom()
         }
-    }
-    
-    func setupInputObservers() {
-        inputTextView.delegate = self
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleTextChange),
-            name: UITextView.textDidChangeNotification,
-            object: nil
-        )
     }
     
     func scrollToBottom() {
@@ -466,40 +441,36 @@ private extension ChatViewController {
 // MARK: - Constraints
 private extension ChatViewController {
     func setupConstraints() {
-        [tableView, inputTextView, sendButton, activityIndicator, dateOverlayLabel, attachmentButton, inputContainerView].forEach { $0.tAMIC() }
+        [tableView, activityIndicator, dateOverlayLabel, inputContainerView].forEach { $0.tAMIC() }
+        
+        let bottomBackground = UIView()
+        bottomBackground.backgroundColor = Colours.deepBlack.color
+        bottomBackground.translatesAutoresizingMaskIntoConstraints = false
+        view.insertSubview(bottomBackground, belowSubview: inputContainerView)
         
         NSLayoutConstraint.activate([
-            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            bottomBackground.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomBackground.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomBackground.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            bottomBackground.topAnchor.constraint(equalTo: inputContainerView.topAnchor),
             
             tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             tableView.leftAnchor.constraint(equalTo: view.leftAnchor),
             tableView.rightAnchor.constraint(equalTo: view.rightAnchor),
-            tableView.bottomAnchor.constraint(equalTo: inputTextView.topAnchor, constant: -8)
+            tableView.bottomAnchor.constraint(equalTo: inputContainerView.topAnchor),
         ])
         
-        bottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
+        NSLayoutConstraint.activate([
+            activityIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+        ])
+        
+        inputContainerBottomConstraint = inputContainerView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         
         NSLayoutConstraint.activate([
+            inputContainerBottomConstraint,
             inputContainerView.leftAnchor.constraint(equalTo: view.leftAnchor),
             inputContainerView.rightAnchor.constraint(equalTo: view.rightAnchor),
-            bottomConstraint,
-            
-            attachmentButton.leftAnchor.constraint(equalTo: inputContainerView.leftAnchor, constant: 16),
-            attachmentButton.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -12),
-            attachmentButton.widthAnchor.constraint(equalToConstant: 36),
-            attachmentButton.heightAnchor.constraint(equalToConstant: 36),
-            
-            sendButton.rightAnchor.constraint(equalTo: inputContainerView.rightAnchor, constant: -16),
-            sendButton.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -12),
-            sendButton.widthAnchor.constraint(equalToConstant: 36),
-            sendButton.heightAnchor.constraint(equalToConstant: 36),
-            
-            inputTextView.leftAnchor.constraint(equalTo: attachmentButton.rightAnchor, constant: 8),
-            inputTextView.rightAnchor.constraint(equalTo: sendButton.leftAnchor, constant: -8),
-            inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -12),
-            inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 12),
-           // inputTextView.heightAnchor.constraint(greaterThanOrEqualToConstant: 40)
         ])
         
         NSLayoutConstraint.activate([
@@ -511,9 +482,18 @@ private extension ChatViewController {
     }
 }
 
-extension ChatViewController: UIAdaptivePresentationControllerDelegate {
-    func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
-        loadMessages()
-        updateSnapshot()
+extension ChatViewController: AttachMenuViewControllerDelegate {
+    func closeTappedDelegate() { }
+    
+    func sendMessageDelegate(text: String) {
+        sendMessage(text: text)
+    }
+    
+    func openFileDelegate() { }
+    
+    func openCameraDelegate() {}
+    
+    func loadGalleryViewDelegate() {
+        presentAttachMenu()
     }
 }

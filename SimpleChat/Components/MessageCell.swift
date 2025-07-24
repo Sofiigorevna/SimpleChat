@@ -7,7 +7,7 @@
 
 import UIKit
 
-final class MessageCell: UITableViewCell {
+final class MessageCell: UITableViewCell, UICollectionViewDelegate {
     private var message: Message?
     
     private let bubbleView = UIView()
@@ -17,7 +17,7 @@ final class MessageCell: UITableViewCell {
     
     private let documentStackView = UIStackView()
     private let fileNameLabel = UILabel()
-    private let iconDocument = UIImageView() //document.circle.fill
+    private let iconDocument = UIImageView()
     private let mimeTypeLabel = UILabel()
     
     private var leadingConstraint: NSLayoutConstraint?
@@ -35,8 +35,14 @@ final class MessageCell: UITableViewCell {
     
     private var imageDataSource = MessageImageDataSource()
     
+    private let primaryAccent = Colours.primaryAccent.color
+    private let darkPrimary = Colours.darkPrimary.color
+    private let lightGray: UIColor = Colours.gray.color
+    private let snowWhite: UIColor = Colours.white.color
+    
     var onReply: ((Message) -> Void)?
     var onDelete: ((Message) -> Void)?
+    public var onImageSelected: (([UIImage], Int) -> Void)?
     
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -80,6 +86,7 @@ final class MessageCell: UITableViewCell {
         
         if imageCount > 0 {
             imageCollectionView.isHidden = false
+            imageCollectionView.isUserInteractionEnabled = true
             imageDataSource.images = images
             imageCollectionView.collectionViewLayout = ChatImageLayoutProvider.makeLayout(for: imageCount)
             imageCollectionView.reloadData()
@@ -140,11 +147,19 @@ final class MessageCell: UITableViewCell {
                 break
         }
     }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let images = imageDataSource.images
+        print("Did select image at index: \(indexPath.item)")
+        onImageSelected?(images, indexPath.item)
+    }
 }
 
 private extension MessageCell {
     func setupView() {
         selectionStyle = .none
+        contentView.backgroundColor = .clear
+        backgroundColor = .clear
         setupLabels()
         setupBubbleView()
         setupImageCollectionView()
@@ -163,8 +178,7 @@ private extension MessageCell {
         messageLabel.font = .systemFont(ofSize: 16)
         
         timeLabel.font = .systemFont(ofSize: 10)
-       // timeLabel.backgroundColor = UIColor.lightGray.withAlphaComponent(0.5)
-        timeLabel.textColor = .secondaryLabel
+        timeLabel.textColor = snowWhite
         timeLabel.textAlignment = .center
         timeLabel.layer.cornerRadius = 8
         timeLabel.layer.masksToBounds = true
@@ -182,16 +196,22 @@ private extension MessageCell {
         imageCollectionView.backgroundColor = .clear
         imageCollectionView.register(ImageCell.self, forCellWithReuseIdentifier: ImageCell.description())
         imageCollectionView.dataSource = imageDataSource
+        imageDataSource.onTapHandler = { [weak self] images, index in
+            self?.onImageSelected?(images, index)
+        }
         imageCollectionView.contentInset = .zero
         imageCollectionView.layoutMargins = .zero
+        imageCollectionView.delegate = self
+        imageCollectionView.isUserInteractionEnabled = true
+        imageCollectionView.canCancelContentTouches = true
+        imageCollectionView.delaysContentTouches = false
     }
     
     func setupDocumentView() {
         iconDocument.translatesAutoresizingMaskIntoConstraints = false
         iconDocument.contentMode = .scaleAspectFit
         iconDocument.image = UIImage(systemName: "doc.circle.fill")
-        iconDocument.tintColor = .darkGray
-//        iconDocument.backgroundColor = .white
+        iconDocument.tintColor = primaryAccent
         iconDocument.setContentHuggingPriority(.required, for: .horizontal)
 
         fileNameLabel.font = .systemFont(ofSize: 14, weight: .semibold)
@@ -199,9 +219,9 @@ private extension MessageCell {
         fileNameLabel.lineBreakMode = .byTruncatingMiddle
         fileNameLabel.adjustsFontSizeToFitWidth = false
         fileNameLabel.minimumScaleFactor = 1.0
-
+        fileNameLabel.textColor = snowWhite
         mimeTypeLabel.font = .systemFont(ofSize: 12)
-        mimeTypeLabel.textColor = .secondaryLabel
+        mimeTypeLabel.textColor = lightGray
 
         let labelsStack = UIStackView(arrangedSubviews: [fileNameLabel, mimeTypeLabel])
         labelsStack.axis = .vertical
@@ -227,15 +247,15 @@ private extension MessageCell {
         trailingConstraint?.isActive = false
         
         if isUser {
-            bubbleView.backgroundColor = .systemGreen
-            messageLabel.textColor = .white
+            bubbleView.backgroundColor = Colours.darkBlue.color
+            messageLabel.textColor = snowWhite
             timeLabel.textAlignment = .right
             
             trailingConstraint = bubbleView.rightAnchor.constraint(equalTo: contentView.rightAnchor, constant: -16)
             leadingConstraint = bubbleView.leftAnchor.constraint(greaterThanOrEqualTo: contentView.leftAnchor, constant: 60)
         } else {
-            bubbleView.backgroundColor = .systemGray5
-            messageLabel.textColor = .black
+            bubbleView.backgroundColor = primaryAccent
+            messageLabel.textColor = snowWhite
             timeLabel.textAlignment = .right
             
             leadingConstraint = bubbleView.leftAnchor.constraint(equalTo: contentView.leftAnchor, constant: 16)
@@ -295,7 +315,7 @@ private extension MessageCell {
             messageLabel.rightAnchor.constraint(equalTo: bubbleView.rightAnchor, constant: -12),
 
             timeLabel.topAnchor.constraint(equalTo: messageLabel.bottomAnchor, constant: 4),
-            timeLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 70),
+            timeLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 38),
             timeLabel.rightAnchor.constraint(equalTo: messageLabel.rightAnchor),
             timeLabel.bottomAnchor.constraint(equalTo: bubbleView.bottomAnchor, constant: -8)
         ]
@@ -368,4 +388,15 @@ extension MessageCell: UIContextMenuInteractionDelegate {
             return UIMenu(title: "", children: [reply, copy, delete])
         }
     }
+    
+        func contextMenuInteraction(
+            _ interaction: UIContextMenuInteraction,
+            previewForHighlightingMenuWithConfiguration configuration: UIContextMenuConfiguration
+        ) -> UITargetedPreview? {
+            let params = UIPreviewParameters()
+            params.backgroundColor = .clear
+
+            let preview = UITargetedPreview(view: self, parameters: params)
+            return preview
+        }
 }

@@ -98,8 +98,7 @@ final class InputContainerView: UIView {
 // MARK: - Setup
 private extension InputContainerView {
     func setupHierarchy() {
-        self.backgroundColor = .systemBackground
-        inputContainerView.backgroundColor = .red
+        self.backgroundColor = Colours.deepBlack.color
         [buttonStackView, inputContainerView].forEach { view in
             self.addSubview(view)
         }
@@ -156,9 +155,9 @@ private extension InputContainerView {
         buttonStackView.spacing = 12
         buttonStackView.translatesAutoresizingMaskIntoConstraints = false
         
-        let galleryButton = makeButton(title: "📷 Галерея", action: #selector(loadGalleryView))
-        let cameraButton = makeButton(title: "📸 Камера", action: #selector(openCamera))
-        let fileButton = makeButton(title: "📁 Файл", action: #selector(openFile))
+        let galleryButton = makeButton(title: "Галерея", iconSystemName: "photo.on.rectangle", action: #selector(loadGalleryView))
+        let cameraButton = makeButton(title: "Камера", iconSystemName: "camera", action: #selector(openCamera))
+        let fileButton = makeButton(title: "Файл", iconSystemName: "folder.fill.badge.plus", action: #selector(openFile))
         
         [galleryButton, cameraButton, fileButton].forEach { buttonStackView.addArrangedSubview($0) }
         
@@ -170,19 +169,25 @@ private extension InputContainerView {
         }
     }
     
-    func makeButton(title: String, action: Selector) -> UIButton {
+    func makeButton(title: String, iconSystemName: String, action: Selector) -> UIButton {
         let button = UIButton()
-        button.setTitleColor(.label, for: .normal)
+        let sendConfig = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+        let sendIcon = UIImage(systemName: iconSystemName, withConfiguration: sendConfig)
+        button.setImage(sendIcon, for: .normal)
+        button.setTitleColor(.white, for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 17)
 
         button.setTitle(title, for: .normal)
         button.layer.cornerRadius = 12
-        button.backgroundColor = .systemGray6
+        button.backgroundColor = .darkGray
+        button.tintColor = Colours.primaryAccent.color
+
         button.addTarget(self, action: action, for: .touchUpInside)
         return button
     }
     
     func setupInputTextView() {
+        inputContainerView.backgroundColor = Colours.deepBlack.color
         inputTextView.font = .systemFont(ofSize: 16)
         inputTextView.layer.cornerRadius = 14
         inputTextView.layer.borderWidth = 1
@@ -195,7 +200,7 @@ private extension InputContainerView {
         let sendConfig = UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)
         let sendIcon = UIImage(systemName: "arrowshape.up.circle.fill", withConfiguration: sendConfig)
         sendButton.setImage(sendIcon, for: .normal)
-        sendButton.tintColor = .darkGray
+        sendButton.tintColor = Colours.primaryAccent.color
         sendButton.backgroundColor = .clear
         sendButton.addTarget(self, action: #selector(sendMessage), for: .touchUpInside)
     }

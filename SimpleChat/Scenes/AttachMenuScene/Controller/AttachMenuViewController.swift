@@ -24,7 +24,6 @@ final class AttachMenuViewController: UIViewController,   UINavigationController
     private var selectedIndexes: Set<IndexPath> = []
     private var collectionView: UICollectionView!
     private var topBarView = TopBarView()
-    
     private let inputContainerView = InputContainerView()
     private var inputContainerBottomConstraint: NSLayoutConstraint!
     
@@ -36,7 +35,7 @@ final class AttachMenuViewController: UIViewController,   UINavigationController
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = Colours.deepBlack.color
         topBarView.delegate = self
         inputContainerView.delegate = self
         
@@ -350,7 +349,6 @@ private extension AttachMenuViewController {
         DispatchQueue.main.async {
             self.imageAssets = newAssets
             self.selectedIndexes.removeAll()
-            self.topBarView.albumButtonSetting(title: album.localizedTitle ?? "Альбом")
             self.collectionView.reloadData()
             self.toggleInputContainerView()
         }
