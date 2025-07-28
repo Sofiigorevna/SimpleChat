@@ -12,13 +12,12 @@ final class MainInputContainerView: UIView {
     private var sendButton = UIButton()
     private var attachmentButton = UIButton()
     private let inputContainerView = UIView()
-
+    
+    private var inputTextViewTopConstraint: NSLayoutConstraint?
+    let replyView = ReplyView()
+    
     weak var delegate: AttachMenuViewControllerDelegate?
-    
-    func prepare() {
-        inputTextView.text = ""
-    }
-    
+   
     // MARK: - Initializers
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -48,6 +47,16 @@ final class MainInputContainerView: UIView {
     
      func handleTapOutside() {
         inputTextView.becomeFirstResponder()
+    }
+    
+    func prepare() {
+        inputTextView.text = ""
+        hideReplyView()
+    }
+    
+    func setReplyMessage(message: Message) {
+        replyView.configure(with: message)
+        showReplyView()
     }
     
     @objc private func handleTextChange() {
@@ -90,11 +99,12 @@ private extension MainInputContainerView {
     func setupHierarchy() {
         self.backgroundColor = Colours.deepBlack.color
         self.addSubview(inputContainerView)
-        inputContainerView.subviewsOnView(attachmentButton, inputTextView, sendButton)
+        inputContainerView.subviewsOnView(replyView, attachmentButton, inputTextView, sendButton)
         
         setupInputTextView()
         setupButtons()
         setupInputObservers()
+        setupReplyView()
     }
     
     func setupInputTextView() {
@@ -134,21 +144,53 @@ private extension MainInputContainerView {
         )
     }
     
-    func setupLayout() {
-        [inputTextView, sendButton, attachmentButton, inputContainerView].forEach { $0.tAMIC() }
+    func setupReplyView() {
+        replyView.isHidden = true
+               replyView.onClose = { [weak self] in
+                   self?.hideReplyView()
+                   self?.delegate?.didCancelReply()
+               }
+    }
     
+    func hideReplyView() {
+        replyView.isHidden = true
+        inputTextViewTopConstraint?.constant = 10
+        UIView.animate(withDuration: 0.2) {
+            self.layoutIfNeeded()
+        }
+    }
+
+    func showReplyView() {
+        replyView.isHidden = false
+        inputTextViewTopConstraint?.constant = 55
+        UIView.animate(withDuration: 0.2) {
+            self.layoutIfNeeded()
+        }
+    }
+    
+    func setupLayout() {
+        [inputTextView, sendButton, attachmentButton, inputContainerView, replyView].forEach { $0.tAMIC() }
+
+        // Создаем и сохраняем top constraint для inputTextView
+        inputTextViewTopConstraint = inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 10)
+        
         NSLayoutConstraint.activate([
             inputContainerView.topAnchor.constraint(equalTo: self.topAnchor),
             inputContainerView.leftAnchor.constraint(equalTo: self.leftAnchor, constant: 16),
             inputContainerView.rightAnchor.constraint(equalTo: self.rightAnchor, constant: -16),
             inputContainerView.bottomAnchor.constraint(equalTo: self.bottomAnchor),
             
+            replyView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 8),
+            replyView.leftAnchor.constraint(equalTo: attachmentButton.leftAnchor, constant: 8),
+            replyView.rightAnchor.constraint(equalTo: sendButton.rightAnchor, constant: -8),
+            replyView.heightAnchor.constraint(equalToConstant: 43),
+            
             attachmentButton.leftAnchor.constraint(equalTo: inputContainerView.leftAnchor, constant: 8),
             attachmentButton.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -12),
             attachmentButton.widthAnchor.constraint(equalToConstant: 36),
             attachmentButton.heightAnchor.constraint(equalToConstant: 36),
             
-            inputTextView.topAnchor.constraint(equalTo: inputContainerView.topAnchor, constant: 10),
+            inputTextViewTopConstraint!,
             inputTextView.leftAnchor.constraint(equalTo: attachmentButton.rightAnchor, constant: 8),
             inputTextView.rightAnchor.constraint(equalTo: sendButton.leftAnchor, constant: -8),
             inputTextView.bottomAnchor.constraint(equalTo: inputContainerView.bottomAnchor, constant: -10),

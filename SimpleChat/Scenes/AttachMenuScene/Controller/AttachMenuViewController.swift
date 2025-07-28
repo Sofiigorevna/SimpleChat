@@ -15,6 +15,7 @@ protocol AttachMenuViewControllerDelegate: AnyObject {
     func openFileDelegate()
     func openCameraDelegate()
     func loadGalleryViewDelegate()
+    func didCancelReply()
 }
 
 final class AttachMenuViewController: UIViewController,   UINavigationControllerDelegate {
@@ -150,6 +151,8 @@ final class AttachMenuViewController: UIViewController,   UINavigationController
 }
 // MARK: - AttachMenuViewControllerDelegate
 extension AttachMenuViewController: AttachMenuViewControllerDelegate {
+    func didCancelReply() { }
+    
     func closeTappedDelegate() {
         self.closeTapped()
     }

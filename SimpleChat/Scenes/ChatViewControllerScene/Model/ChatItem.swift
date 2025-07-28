@@ -19,13 +19,22 @@ struct Message: Hashable {
     let isFromUser: Bool
     let imagesData: [Data]?   
     let documentData: Document?
+    let replyToId: UUID?
     
-    init(text: String?, timestamp: Date, isFromUser: Bool, imagesData: [Data]? = nil, documentData: Document? = nil) {
+    init(
+        text: String?,
+        timestamp: Date,
+        isFromUser: Bool,
+        imagesData: [Data]? = nil,
+        documentData: Document? = nil,
+        replyToId: UUID? = nil
+    ) {
         self.text = text
         self.timestamp = timestamp
         self.isFromUser = isFromUser
         self.imagesData = imagesData
         self.documentData = documentData
+        self.replyToId = replyToId
     }
     
     func hash(into hasher: inout Hasher) {
@@ -40,7 +49,7 @@ struct Message: Hashable {
 
 extension Message: Codable {
     enum CodingKeys: String, CodingKey {
-        case text, timestamp, isFromUser, imagesData, documentData
+        case text, timestamp, isFromUser, imagesData, documentData, replyToId
     }
 }
 

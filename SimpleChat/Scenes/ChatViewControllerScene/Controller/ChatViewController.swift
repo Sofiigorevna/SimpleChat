@@ -10,6 +10,8 @@ import UIKit
 final class ChatViewController: UIViewController {
     private let webSocketManager = WebSocketManager()
     private var messages: [ChatItem] = []
+    private var repliedMessage: Message?
+    
     private var dataSource: UITableViewDiffableDataSource<Int, ChatItem>!
     
     private var inputContainerBottomConstraint: NSLayoutConstraint!
@@ -93,13 +95,16 @@ final class ChatViewController: UIViewController {
             text: text,
             timestamp: Date(),
             isFromUser: true,
-            imagesData: nil
+            imagesData: nil,
+            replyToId: repliedMessage?.id
         )
         
         messages.append(.message(newMessage))
         updateSnapshot()
         webSocketManager.sendTextAndImage(text: text, imageData: [])
         inputContainerView.prepare()
+        // Очищаем repliedMessage после отправки
+        repliedMessage = nil
         saveMessages()
     }
     
@@ -241,13 +246,8 @@ private extension ChatViewController {
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = .black
         
-        // 1. базовый шрифт
         let baseFont = UIFont.systemFont(ofSize: 17, weight: .semibold)
-        
-        // 2. Масштабируем его через UIFontMetrics (если нужно поддержать Dynamic Type)
         let scaledFont = UIFontMetrics(forTextStyle: .headline).scaledFont(for: baseFont)
-        
-        // 3. Применяем к заголовку
         appearance.titleTextAttributes = [
             .foregroundColor: UIColor.white,
             .font: scaledFont
@@ -321,6 +321,11 @@ private extension ChatViewController {
                         let vc = ImageItemViewController(imageURLs: images, initialIndex: index)
                         self?.navigationController?.pushViewController(vc, animated: true)
                     }
+                    
+                    cell.onReply = { [weak self] message in
+                        self?.handleReply(to: message)
+                    }
+                    
                     cell.backgroundView?.backgroundColor = .clear
                     return cell
                 case .date(let date):
@@ -437,6 +442,12 @@ private extension ChatViewController {
         }
         dateOverlayLabel.isHidden = false
     }
+    
+    func handleReply(to message: Message) {
+        repliedMessage = message
+        inputContainerView.setReplyMessage(message: message)
+        inputContainerView.handleTapOutside()
+    }
 }
 // MARK: - Constraints
 private extension ChatViewController {
@@ -483,6 +494,10 @@ private extension ChatViewController {
 }
 
 extension ChatViewController: AttachMenuViewControllerDelegate {
+    func didCancelReply() {
+        repliedMessage = nil
+    }
+    
     func closeTappedDelegate() { }
     
     func sendMessageDelegate(text: String) {
