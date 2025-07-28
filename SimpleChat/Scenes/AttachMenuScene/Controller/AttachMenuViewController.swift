@@ -556,6 +556,7 @@ extension AttachMenuViewController: UIImagePickerControllerDelegate {
         }
         if selectedImages.count < maxSelectionLimit {
             self.selectedImages = [image]
+            self.sendMessageDelegate(text: "")
         } else {
             showLimitExceededAlert()
         }
